@@ -1,7 +1,5 @@
 package com.welen.it.pullanimation;
 
-import android.os.SystemClock;
-
 import java.text.DecimalFormat;
 
 public class FPSTracker
@@ -55,7 +53,7 @@ public class FPSTracker
         if (interval >= FPS_MAX_INTERVAL)  
         {  
             //nanoTime()返回最准确的可用系统计时器的当前值，以毫微秒为单位  
-            long timeNow = SystemClock.elapsedRealtimeNanos();
+            long timeNow = System.nanoTime();
             // 获得到目前为止的时间距离  
             long realTime = timeNow - time; // 单位: ns  
             //换算为实际的fps数值  
