@@ -84,7 +84,7 @@ public class PullAnimationView extends View {
     }
 
     enum LineMode{
-        //消失当长度是圆圈增加当边长
+        //消失的长度是圆圈增加的边长
         ABSOLUTE,
         //相对未知需要根据{@link #mLinePercent}来确定
         RELATIVE,
@@ -203,6 +203,7 @@ public class PullAnimationView extends View {
         if(widthMode == MeasureSpec.EXACTLY){
             // 上层已经告诉我们要多大了，照做就可以
             width = widthSize;
+            //TODO 由于半径和线的长度时分开设置的，如果这个时候宽度太小，需要调整半径等相关等值
         }else{
             width = getActualWidth(extra);
             width = width + getPaddingLeft() + getPaddingRight();
@@ -215,6 +216,7 @@ public class PullAnimationView extends View {
 
         if(heightMode == MeasureSpec.EXACTLY){
             height = heightSize;
+            //TODO 由于半径和线的长度时分开设置的，如果这个时候高度太小，需要调整半径等相关等值
         }else{
             height = getActualHeight(extra);
             height = height + getPaddingTop() + getPaddingBottom();
