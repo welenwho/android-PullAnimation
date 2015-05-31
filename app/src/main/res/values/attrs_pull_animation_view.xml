@@ -1,0 +1,23 @@
+<resources>
+    <declare-styleable name="PullAnimationView">
+        <attr name="lineMode" format="string" >
+            <enum name="absolute" value="0"/>
+            <enum name="relative" value="1"/>
+            <enum name="fixed" value="2"/>
+        </attr>
+        <attr name="lineLen" format="dimension|reference" />
+        <attr name="linePercent" format="float" />
+
+        <attr name="efficacyNum" format="integer" />
+        <attr name="efficacyLen" format="reference|dimension" />
+        <attr name="efficacyDist" format="reference|dimension" />
+
+        <attr name="arrowAngle" format="integer" />
+        <attr name="arrowLen" format="dimension|reference" />
+
+        <attr name="radius" format="dimension|reference" />
+        <attr name="color" format="color|reference" />
+        <attr name="stokeWidth" format="dimension|reference" />
+        <attr name="centerByCircle" format="boolean" />
+    </declare-styleable>
+</resources>
