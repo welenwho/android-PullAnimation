@@ -27,10 +27,8 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.PointF;
 import android.graphics.RectF;
-import android.os.SystemClock;
 import android.text.TextPaint;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
 import android.view.animation.AccelerateDecelerateInterpolator;
@@ -39,7 +37,7 @@ import android.view.animation.DecelerateInterpolator;
 
 
 /**
- * TODO: document your custom view class.
+ * 一个动画View
  */
 public class PullAnimationView extends View {
 
@@ -53,7 +51,7 @@ public class PullAnimationView extends View {
      * 这个属性用来当line mode 为relative当时候，设置相对的比例
      */
     private float mLinePercent = 0.5f;
-    private LineMode mLineMode = LineMode.RELATIVE;
+    private LineMode mLineMode;
     private AnimationState mState = AnimationState.LINE_ARROW;
     float mProcess = 0;
     int mGravity = Gravity.CENTER;
@@ -73,6 +71,7 @@ public class PullAnimationView extends View {
     private PointF mPoint = new PointF();
     private PointF mCenter = new PointF();
     private FPSTracker mTracker;
+    private Style mStyle;
     /**
      * 此属性获取系统的
      */
@@ -80,12 +79,16 @@ public class PullAnimationView extends View {
             android.R.attr.gravity,
     };
 
+    enum Style {
+        TOP, BOTTOM
+    }
+
     enum LineMode{
         //消失当长度是圆圈增加当边长
         ABSOLUTE,
         //相对未知需要根据{@link #mLinePercent}来确定
         RELATIVE,
-        //长度不会跟着变化
+
         FIXED
     }
     enum AnimationState {
@@ -117,6 +120,14 @@ public class PullAnimationView extends View {
         }
     }
 
+    private Style parseStyle(int value){
+        if(value == 0){
+            return Style.TOP;
+        }else{
+            return Style.BOTTOM;
+        }
+    }
+
     private void init(AttributeSet attrs, int defStyle) {
         //获取系统的属性
         TypedArray typedArray = getContext().obtainStyledAttributes(attrs, ATTRS);
@@ -138,9 +149,10 @@ public class PullAnimationView extends View {
         mEfficacyNum = a.getInt(R.styleable.PullAnimationView_efficacyNum, mEfficacyNum);
         mCenterByCircle = a.getBoolean(R.styleable.PullAnimationView_centerByCircle, false);
         mLineLen = a.getDimension(R.styleable.PullAnimationView_lineLen, mLineLen);
-        mLineMode = parseLineMode(a.getInt(R.styleable.PullAnimationView_lineMode, 0));
+        mLineMode = parseLineMode(a.getInt(R.styleable.PullAnimationView_lineMode, 0));//default absolute
         mRadius = a.getDimension(R.styleable.PullAnimationView_radius, mRadius);
         mLinePercent = a.getFloat(R.styleable.PullAnimationView_linePercent, mLinePercent);
+        mStyle = parseStyle(a.getInt(R.styleable.PullAnimationView_style, 1));//default bottom
         a.recycle();
 
         mPaint = new Paint();
@@ -150,12 +162,12 @@ public class PullAnimationView extends View {
         mTracker = new FPSTracker();
         mTracker.setTime(System.nanoTime());
 
-        // Update TextPaint and text measurements from attributes
-        invalidateTextPaintAndMeasurements();
+        invalidatePaintAndMeasurements();
 
         if(DEBUG){
             mTextPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
             mTextPaint.setColor(Color.GREEN);
+            mTextPaint.setStyle(Paint.Style.STROKE);
             mTextPaint.setTextSize(50);
             setOnClickListener(new OnClickListener() {
                 @Override
@@ -170,11 +182,14 @@ public class PullAnimationView extends View {
         }
     }
 
-    private void invalidateTextPaintAndMeasurements() {
+    private void invalidatePaintAndMeasurements() {
         mPaint.setColor(mColor);
         mPaint.setStrokeWidth(mStokeWidth);
     }
 
+    private boolean isTopStyle(){
+        return mStyle == Style.TOP;
+    }
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
@@ -189,7 +204,7 @@ public class PullAnimationView extends View {
             // 上层已经告诉我们要多大了，照做就可以
             width = widthSize;
         }else{
-            width = (int) ((mRadius + extra) * 2);
+            width = getActualWidth(extra);
             width = width + getPaddingLeft() + getPaddingRight();
             // 确认一下最小宽度
             width = Math.max(width, getSuggestedMinimumWidth());
@@ -201,9 +216,7 @@ public class PullAnimationView extends View {
         if(heightMode == MeasureSpec.EXACTLY){
             height = heightSize;
         }else{
-            height = (int)(mCenterByCircle
-                    ? (mRadius + Math.max(mLineLen,extra)) * 2
-                    : (mRadius * 2 + Math.max(mLineLen,extra) + extra));
+            height = getActualHeight(extra);
             height = height + getPaddingTop() + getPaddingBottom();
             height = Math.max(height, getSuggestedMinimumHeight());
             if(heightMode == MeasureSpec.AT_MOST){
@@ -211,6 +224,24 @@ public class PullAnimationView extends View {
             }
         }
         setMeasuredDimension(width, height);
+    }
+
+    private int getActualWidth(int extra) {
+        return (int) ((mRadius + extra) * 2);
+    }
+
+    private int getActualHeight(int extra) {
+        int height;
+        if(mStyle == Style.TOP){
+            height = (int)(mCenterByCircle
+                    ? (mRadius + Math.max(mLineLen,extra)) * 2
+                    : (mRadius * 2 + Math.max(mLineLen,extra) + extra));
+        } else{//bottom
+            height = (int) (mCenterByCircle
+                    ? (Math.max(mLineLen - mRadius, mRadius +extra) * 2)
+                    : Math.max(mLineLen + extra, (mRadius +extra) * 2));
+        }
+        return height;
     }
 
 
@@ -225,21 +256,34 @@ public class PullAnimationView extends View {
         int paddingBottom = getPaddingBottom();
 
         int contentWidth = width - paddingLeft - paddingRight;
-        //int contentHeight = height - paddingTop - paddingBottom;
+        int contentHeight = height - paddingTop - paddingBottom;
         int extra = (int) (mEfficacyLen + mEfficacyDist);
-        int realWidth = (int) (mRadius + extra) * 2;
-        //int realHeight = (int) (mRadius * 2 + Math.max(mLineLen, extra) + extra);
+        int realWidth = getActualWidth(extra);
+        int realHeight = getActualHeight(extra);
         //非黑即白
-        if(Gravity.LEFT == mGravity){
+        if(Gravity.LEFT == (mGravity & Gravity.HORIZONTAL_GRAVITY_MASK)){
             mCenter.x = realWidth / 2;
-        }else if (Gravity.RIGHT  == mGravity){
+        }else if (Gravity.RIGHT  == (mGravity & Gravity.HORIZONTAL_GRAVITY_MASK)){
             mCenter.x = contentWidth - realWidth / 2;
         }else{
             mCenter.x = contentWidth / 2;
         }
-        mCenter.y = Math.max(mLineLen, extra) + mRadius;//暂时不处理垂直方向的gravity
-        mCenter.offset(getPaddingLeft(), getPaddingTop());
+        if(isTopStyle()){
+            mCenter.y = Math.max(mLineLen, extra) + mRadius;//暂时不处理垂直方向的gravity
+        } else {
+            mCenter.y = Math.max(mRadius + extra, mLineLen - mRadius);
+        }
+        if(Gravity.TOP == (mGravity & Gravity.VERTICAL_GRAVITY_MASK)){
+            //nothing
+        }else if(Gravity.BOTTOM == (mGravity & Gravity.VERTICAL_GRAVITY_MASK)){
+            mCenter.y += (contentHeight - realHeight);
+        }else{
+            mCenter.y += (contentHeight - realHeight) / 2;
+        }
+
+        mCenter.offset(paddingLeft, paddingTop);
         mRectF.set(mCenter.x - mRadius, mCenter.y - mRadius, mCenter.x + mRadius, mCenter.y + mRadius);
+
     }
 
     @Override
@@ -249,8 +293,8 @@ public class PullAnimationView extends View {
             case LINE_ARROW:
                 mAngle = 0;
                 drawLine(canvas, mAngle);
-                mPoint.set(mCenter.x, mCenter.y - mRadius);
-                drawArrow(canvas, mPoint, 90);
+                mPoint.set(mCenter.x, generateStartY());
+                drawArrow(canvas, mPoint, isTopStyle() ? 90 : -90);
                 break;
             case ARROW_CIRCLE:
                 drawLine(canvas, mAngle);
@@ -278,7 +322,8 @@ public class PullAnimationView extends View {
 
         if(DEBUG){
             mTracker.makeFPS();
-            canvas.drawText(mTracker.getFPS(),0, 80, mTextPaint);
+            canvas.drawText(mTracker.getFPS(), 0, 80, mTextPaint);
+            canvas.drawRect(mRectF, mTextPaint);
         }
 
     }
@@ -344,8 +389,7 @@ public class PullAnimationView extends View {
     ValueAnimator.AnimatorUpdateListener updateListener = new ValueAnimator.AnimatorUpdateListener() {
         @Override
         public void onAnimationUpdate(ValueAnimator animation) {
-            int value = (Integer) animation.getAnimatedValue();
-            mAngle = value;
+            mAngle = (Integer) animation.getAnimatedValue();
             postInvalidate();
         }
     };
@@ -422,7 +466,7 @@ public class PullAnimationView extends View {
      */
     private void drawLine(Canvas canvas, float rotation){
         float startX = mCenter.x;
-        float startY = mCenter.y - mRadius;
+        float startY = generateStartY();
         float endX = startX;
         float offset;
         if(mLineMode == LineMode.RELATIVE){
@@ -440,8 +484,13 @@ public class PullAnimationView extends View {
         canvas.drawLine(startX, startY, endX, endY, mPaint);
     }
 
+    private float generateStartY() {
+        return mCenter.y + (isTopStyle() ? -mRadius : mRadius);
+    }
+
     private void calculateArrowPosition(float rotation){
-        double radian = angle2Radian(rotation - 90);
+        int repairValue = isTopStyle() ? -90 : 90;
+        double radian = angle2Radian(rotation + repairValue);
         float x = mCenter.x + (float) (mRadius * Math.cos(radian));
         float y = mCenter.y + (float) (mRadius * Math.sin(radian));
         mPoint.set(x, y);
@@ -449,8 +498,9 @@ public class PullAnimationView extends View {
 
 
     private void drawArrow(Canvas canvas, PointF pointF, float rotation){
+        int repairValue = isTopStyle() ? -180 : 0;
         double radian = angle2Radian(mArrowAngle);
-        double rotationRadian = angle2Radian(rotation-180);
+        double rotationRadian = angle2Radian(rotation + repairValue);
         double leftRadian = radian+ rotationRadian;
         double rightRadian = (2 * Math.PI - radian) + rotationRadian;
         double x1 = mArrowLen * Math.cos(leftRadian) + pointF.x;
@@ -463,7 +513,8 @@ public class PullAnimationView extends View {
 
     RectF mRectF = new RectF();
     private void drawArc(Canvas canvas, float rotation){
-        canvas.drawArc(mRectF, -90, rotation, false, mPaint);
+        int repairValue = isTopStyle() ? -90 : 90;
+        canvas.drawArc(mRectF, repairValue, rotation, false, mPaint);
     }
 
     private double angle2Radian(float angle){

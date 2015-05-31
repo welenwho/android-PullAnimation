@@ -1,6 +1,6 @@
 <resources>
     <declare-styleable name="PullAnimationView">
-        <attr name="lineMode" format="string" >
+        <attr name="lineMode" format="integer" >
             <enum name="absolute" value="0"/>
             <enum name="relative" value="1"/>
             <enum name="fixed" value="2"/>
@@ -19,5 +19,9 @@
         <attr name="color" format="color|reference" />
         <attr name="stokeWidth" format="dimension|reference" />
         <attr name="centerByCircle" format="boolean" />
+        <attr name="style" format="integer" >
+            <enum name="top" value="0"/>
+            <enum name="bottom" value="1"/>
+        </attr>
     </declare-styleable>
 </resources>
