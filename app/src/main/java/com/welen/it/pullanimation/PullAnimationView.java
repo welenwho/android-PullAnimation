@@ -1,5 +1,9 @@
 package com.welen.it.pullanimation;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
+import android.animation.AnimatorSet;
+import android.animation.ValueAnimator;
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.Canvas;
@@ -13,41 +17,29 @@ import android.util.AttributeSet;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
+import android.view.animation.AccelerateDecelerateInterpolator;
+import android.view.animation.AccelerateInterpolator;
+import android.view.animation.DecelerateInterpolator;
 
 
 /**
  * TODO: document your custom view class.
  */
 public class PullAnimationView extends View {
-    public static final boolean DEBUG = true;
-    enum LineMode{
-        //消失当长度是圆圈增加当边长
-        ABSOLUTE,
-        //相对未知需要根据{@link #mLinePercent}来确定
-        RELATIVE,
-        //长度不会跟着变化
-        FIXED
-    }
-    enum AnimationState {
-        LINE_ARROW, ARROW_CIRCLE, SCALE_CIRCLE, CIRCLE_EFFICACY
-    }
 
-    /**
-     * 此属性获取系统的
-     */
-    private static final int[] ATTRS = new int[] {
-            android.R.attr.gravity,
-    };
+    public static final boolean DEBUG = true;
+    private static final int TAG_CIRCLE_ARROW = R.id.animator_circle_arrow_tag;
+    private static final int TAG_CIRCLE_SCALE = R.id.animator_circle_scale_tag;
+
     private float mAngle = 0;
     private float mLineLen = 200;
     /**
-     * 这个属性用来当line mode 为relative当时候，设置相对当比例
+     * 这个属性用来当line mode 为relative当时候，设置相对的比例
      */
     private float mLinePercent = 0.5f;
     private LineMode mLineMode = LineMode.RELATIVE;
     private AnimationState mState = AnimationState.LINE_ARROW;
     float mProcess = 0;
-    boolean revert = false;
     int mGravity = Gravity.CENTER;
 
     int mEfficacyNum = 8;
@@ -65,6 +57,24 @@ public class PullAnimationView extends View {
     private PointF mPoint = new PointF();
     private PointF mCenter = new PointF();
     private FPSTracker mTracker;
+    /**
+     * 此属性获取系统的
+     */
+    private static final int[] ATTRS = new int[] {
+            android.R.attr.gravity,
+    };
+
+    enum LineMode{
+        //消失当长度是圆圈增加当边长
+        ABSOLUTE,
+        //相对未知需要根据{@link #mLinePercent}来确定
+        RELATIVE,
+        //长度不会跟着变化
+        FIXED
+    }
+    enum AnimationState {
+        LINE_ARROW, ARROW_CIRCLE, SCALE_CIRCLE, CIRCLE_EFFICACY
+    }
 
     public PullAnimationView(Context context) {
         super(context);
@@ -121,25 +131,27 @@ public class PullAnimationView extends View {
         mPaint.setFlags(Paint.ANTI_ALIAS_FLAG);
         mPaint.setStyle(Paint.Style.STROKE);
 
-        if(DEBUG){
-            mTextPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
-            mTextPaint.setColor(Color.GREEN);
-            mTextPaint.setTextSize(50);
-        }
-
         mTracker = new FPSTracker();
         mTracker.setTime(SystemClock.elapsedRealtimeNanos());
 
         // Update TextPaint and text measurements from attributes
         invalidateTextPaintAndMeasurements();
-        setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                mState = AnimationState.ARROW_CIRCLE;
-                mProcess = 0;
-                mAngle = 0;
-            }
-        });
+
+        if(DEBUG){
+            mTextPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+            mTextPaint.setColor(Color.GREEN);
+            mTextPaint.setTextSize(50);
+            setOnClickListener(new OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if(mState == AnimationState.LINE_ARROW){
+                        setCurrentState(AnimationState.ARROW_CIRCLE);
+                    }else{
+                        reset();
+                    }
+                }
+            });
+        }
     }
 
     private void invalidateTextPaintAndMeasurements() {
@@ -229,27 +241,9 @@ public class PullAnimationView extends View {
                 drawArc(canvas, mAngle);
                 calculateArrowPosition(mAngle);
                 drawArrow(canvas, mPoint, mAngle);
-                mAngle += 4;
-                if (mAngle > 360) {
-                    mAngle = 360;
-                    mState = AnimationState.SCALE_CIRCLE;
-                }
                 break;
             case SCALE_CIRCLE:
                 drawCircle(canvas, mAngle / 360);
-                if (revert) {
-                    mAngle += 15;
-                    if (mAngle > 360) {
-                        mAngle = mAngle % 360;
-                        mState = AnimationState.CIRCLE_EFFICACY;
-                    }
-                } else {
-                    mAngle -= 15;
-                    if (mAngle < 0) {
-                        mAngle = 0;
-                        revert = true;
-                    }
-                }
                 break;
             case CIRCLE_EFFICACY:
                 drawCircle(canvas, 1);
@@ -262,6 +256,7 @@ public class PullAnimationView extends View {
                 if (mAngle > 360) {
                     mAngle = mAngle % 360;
                 }
+                postInvalidate();
                 break;
         }
 
@@ -269,7 +264,114 @@ public class PullAnimationView extends View {
             mTracker.makeFPS();
             canvas.drawText(mTracker.getFPS(),0, 80, mTextPaint);
         }
+
+    }
+
+    public void startArrowCircleAnimator(){
+        ValueAnimator valueAnimator = ValueAnimator.ofInt(0, 360);
+        valueAnimator.setDuration(1000);
+        valueAnimator.setInterpolator(new AccelerateDecelerateInterpolator());
+        valueAnimator.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationStart(Animator animation) {
+                super.onAnimationStart(animation);
+                mState = AnimationState.ARROW_CIRCLE;
+            }
+
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                super.onAnimationEnd(animation);
+                setTag(TAG_CIRCLE_ARROW, null);
+                if(mState == AnimationState.ARROW_CIRCLE){//check state
+                    startScaleCircleAnimator();
+                }
+            }
+        });
+        valueAnimator.addUpdateListener(updateListener);
+        setTag(TAG_CIRCLE_ARROW, valueAnimator);
+        valueAnimator.start();
+    }
+
+
+    public void startScaleCircleAnimator(){
+        ValueAnimator valueAnimator1 = ValueAnimator.ofInt(360, 0);
+        valueAnimator1.setDuration(200);
+        valueAnimator1.setInterpolator(new AccelerateInterpolator());
+        ValueAnimator valueAnimator2 = ValueAnimator.ofInt(0, 360);
+        valueAnimator2.setDuration(200);
+        valueAnimator2.setInterpolator(new DecelerateInterpolator());
+        valueAnimator1.addUpdateListener(updateListener);
+        valueAnimator2.addUpdateListener(updateListener);
+
+        AnimatorSet set = new AnimatorSet();
+        set.playSequentially(valueAnimator1, valueAnimator2);
+        set.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationStart(Animator animation) {
+                super.onAnimationStart(animation);
+                mState = AnimationState.SCALE_CIRCLE;
+            }
+
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                super.onAnimationEnd(animation);
+                setTag(TAG_CIRCLE_SCALE, null);
+                mState = AnimationState.CIRCLE_EFFICACY;
+                mProcess = 0;
+                postInvalidate();
+            }
+        });
+        setTag(TAG_CIRCLE_SCALE, set);
+        set.start();
+    }
+
+    ValueAnimator.AnimatorUpdateListener updateListener = new ValueAnimator.AnimatorUpdateListener() {
+        @Override
+        public void onAnimationUpdate(ValueAnimator animation) {
+            int value = (Integer) animation.getAnimatedValue();
+            mAngle = value;
+            postInvalidate();
+        }
+    };
+
+    public void setCurrentState(AnimationState state){
+        if(state == mState)return;//nothing
+        cancelAnimatorIfNeed(TAG_CIRCLE_ARROW);
+        cancelAnimatorIfNeed(TAG_CIRCLE_SCALE);
+        mState = state;
+        switch (state){
+            case LINE_ARROW:
+                mAngle = 0;
+                break;
+            case ARROW_CIRCLE:
+                startArrowCircleAnimator();
+                break;
+            case SCALE_CIRCLE:
+                startScaleCircleAnimator();
+                break;
+            case CIRCLE_EFFICACY:
+                mProcess = 0;
+                break;
+        }
         postInvalidate();
+    }
+
+    public AnimationState getCurrentState(){
+        return mState;
+    }
+
+    private void cancelAnimatorIfNeed(int tag) {
+        Animator animator = (Animator) getTag();
+        if(animator != null){
+            if(animator.isRunning()){
+                animator.cancel();
+            }
+            setTag(tag, null);
+        }
+    }
+
+    public void reset(){
+        setCurrentState(AnimationState.LINE_ARROW);
     }
 
     private void drawEfficacy(Canvas canvas, float process, float rotation){
@@ -292,6 +394,7 @@ public class PullAnimationView extends View {
      * @param process
      */
     private void drawCircle(Canvas canvas, float process){
+        mPaint.setAlpha((int) (255 * process));
         canvas.drawCircle(mCenter.x, mCenter.y, mRadius * process, mPaint);
     }
 

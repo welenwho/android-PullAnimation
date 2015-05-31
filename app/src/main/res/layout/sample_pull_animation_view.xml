@@ -8,6 +8,16 @@
         android:layout_height="wrap_content"
         android:gravity="center"
         app:centerByCircle="true"
+        app:efficacyDist="8dp"
+        app:efficacyNum="10"
+        app:efficacyLen="8dp"
+        app:radius="20dp"
+        app:color="#f00"
+        app:lineLen="20dp"
+        app:lineMode="absolute"
+        app:linePercent="0.8"
+        app:arrowLen="5dp"
+        app:stokeWidth="1dp"
         android:background="#ccc" />
 
 </FrameLayout>
