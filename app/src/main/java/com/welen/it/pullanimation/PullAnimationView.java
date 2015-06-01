@@ -275,7 +275,7 @@ public class PullAnimationView extends View {
             mCenter.x = contentWidth / 2;
         }
         if(isTopStyle()){
-            mCenter.y = Math.max(mLineLen, extra) + mRadius;//暂时不处理垂直方向的gravity
+            mCenter.y = Math.max(mLineLen, extra) + mRadius;
         } else {
             mCenter.y = Math.max(mRadius + extra, mLineLen - mRadius);
         }
