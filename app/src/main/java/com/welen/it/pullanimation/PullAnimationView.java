@@ -42,6 +42,8 @@ import android.view.animation.DecelerateInterpolator;
 public class PullAnimationView extends View {
 
     public static final boolean DEBUG = true;
+    public static final int TYPE_AUTO = 0;
+    public static final int TYPE_MANUAL = 1;
     private static final int TAG_CIRCLE_ARROW = R.id.animator_circle_arrow_tag;
     private static final int TAG_CIRCLE_SCALE = R.id.animator_circle_scale_tag;
 
@@ -52,7 +54,7 @@ public class PullAnimationView extends View {
      */
     private float mLinePercent = 0.5f;
     private LineMode mLineMode;
-    private AnimationState mState = AnimationState.LINE_ARROW;
+    private AnimationState mState = AnimationState.NORMAL;
     float mProcess = 0;
     int mGravity = Gravity.CENTER;
 
@@ -72,6 +74,7 @@ public class PullAnimationView extends View {
     private PointF mCenter = new PointF();
     private FPSTracker mTracker;
     private Style mStyle;
+    private int mType = TYPE_AUTO;
     /**
      * 此属性获取系统的
      */
@@ -92,7 +95,7 @@ public class PullAnimationView extends View {
         FIXED
     }
     enum AnimationState {
-        LINE_ARROW, ARROW_CIRCLE, SCALE_CIRCLE, CIRCLE_EFFICACY
+        NORMAL, PULLING_DOWN, RELEASE, REFRESHING
     }
 
     public PullAnimationView(Context context) {
@@ -153,6 +156,7 @@ public class PullAnimationView extends View {
         mRadius = a.getDimension(R.styleable.PullAnimationView_radius, mRadius);
         mLinePercent = a.getFloat(R.styleable.PullAnimationView_linePercent, mLinePercent);
         mStyle = parseStyle(a.getInt(R.styleable.PullAnimationView_style, 1));//default bottom
+        mType = a.getInt(R.styleable.PullAnimationView_type, mType);
         a.recycle();
 
         mPaint = new Paint();
@@ -169,16 +173,16 @@ public class PullAnimationView extends View {
             mTextPaint.setColor(Color.GREEN);
             mTextPaint.setStyle(Paint.Style.STROKE);
             mTextPaint.setTextSize(50);
-            setOnClickListener(new OnClickListener() {
+            /*setOnClickListener(new OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    if(mState == AnimationState.LINE_ARROW){
-                        setCurrentState(AnimationState.ARROW_CIRCLE);
+                    if(mState == AnimationState.NORMAL){
+                        setCurrentState(AnimationState.PULLING_DOWN);
                     }else{
                         reset();
                     }
                 }
-            });
+            });*/
         }
     }
 
@@ -292,22 +296,22 @@ public class PullAnimationView extends View {
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
         switch (mState) {
-            case LINE_ARROW:
+            case NORMAL:
                 mAngle = 0;
                 drawLine(canvas, mAngle);
                 mPoint.set(mCenter.x, generateStartY());
                 drawArrow(canvas, mPoint, isTopStyle() ? 90 : -90);
                 break;
-            case ARROW_CIRCLE:
+            case PULLING_DOWN:
                 drawLine(canvas, mAngle);
                 drawArc(canvas, mAngle);
                 calculateArrowPosition(mAngle);
                 drawArrow(canvas, mPoint, mAngle);
                 break;
-            case SCALE_CIRCLE:
+            case RELEASE:
                 drawCircle(canvas, mAngle / 360);
                 break;
-            case CIRCLE_EFFICACY:
+            case REFRESHING:
                 drawCircle(canvas, 1);
                 drawEfficacy(canvas, mProcess / 100, mAngle);
                 mProcess += 2;
@@ -338,14 +342,14 @@ public class PullAnimationView extends View {
             @Override
             public void onAnimationStart(Animator animation) {
                 super.onAnimationStart(animation);
-                mState = AnimationState.ARROW_CIRCLE;
+                mState = AnimationState.PULLING_DOWN;
             }
 
             @Override
             public void onAnimationEnd(Animator animation) {
                 super.onAnimationEnd(animation);
                 setTag(TAG_CIRCLE_ARROW, null);
-                if(mState == AnimationState.ARROW_CIRCLE){//check state
+                if (mState == AnimationState.PULLING_DOWN) {//check state
                     startScaleCircleAnimator();
                 }
             }
@@ -372,14 +376,14 @@ public class PullAnimationView extends View {
             @Override
             public void onAnimationStart(Animator animation) {
                 super.onAnimationStart(animation);
-                mState = AnimationState.SCALE_CIRCLE;
+                mState = AnimationState.RELEASE;
             }
 
             @Override
             public void onAnimationEnd(Animator animation) {
                 super.onAnimationEnd(animation);
                 setTag(TAG_CIRCLE_SCALE, null);
-                mState = AnimationState.CIRCLE_EFFICACY;
+                mState = AnimationState.REFRESHING;
                 mProcess = 0;
                 postInvalidate();
             }
@@ -396,22 +400,35 @@ public class PullAnimationView extends View {
         }
     };
 
+    public void pulling(float process){
+        if(mState == AnimationState.RELEASE || mState == AnimationState.REFRESHING)return;
+        if(mState == AnimationState.NORMAL){
+            setCurrentState(AnimationState.PULLING_DOWN);
+        }
+        mAngle = process * 360;
+        postInvalidate();
+    }
+
     public void setCurrentState(AnimationState state){
         if(state == mState)return;//nothing
         cancelAnimatorIfNeed(TAG_CIRCLE_ARROW);
         cancelAnimatorIfNeed(TAG_CIRCLE_SCALE);
         mState = state;
         switch (state){
-            case LINE_ARROW:
+            case NORMAL:
                 mAngle = 0;
                 break;
-            case ARROW_CIRCLE:
-                startArrowCircleAnimator();
+            case PULLING_DOWN:
+                if(mType == TYPE_AUTO){//自动的情况下直接运行动画
+                    startArrowCircleAnimator();
+                }else if(mType == TYPE_MANUAL){
+                    mAngle = 0;
+                }
                 break;
-            case SCALE_CIRCLE:
+            case RELEASE:
                 startScaleCircleAnimator();
                 break;
-            case CIRCLE_EFFICACY:
+            case REFRESHING:
                 mProcess = 0;
                 break;
         }
@@ -433,7 +450,7 @@ public class PullAnimationView extends View {
     }
 
     public void reset(){
-        setCurrentState(AnimationState.LINE_ARROW);
+        setCurrentState(AnimationState.NORMAL);
     }
 
     private void drawEfficacy(Canvas canvas, float process, float rotation){

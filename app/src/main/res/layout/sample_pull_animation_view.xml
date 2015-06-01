@@ -4,10 +4,11 @@
     android:layout_height="match_parent">
 
     <com.welen.it.pullanimation.PullAnimationView
+        android:id="@+id/pull_view"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center_horizontal|bottom"
-        app:style="bottom"
+        app:style="top"
         app:centerByCircle="true"
         app:efficacyDist="8dp"
         app:efficacyNum="10"
@@ -18,6 +19,7 @@
         app:lineMode="relative"
         app:linePercent="0.8"
         app:arrowLen="5dp"
+        app:type="manual"
         app:stokeWidth="1dp"
         android:background="#ccc" />
 
